@@ -1,11 +1,13 @@
 (ns projekti.core
-  (:require
-   [reagent.core :as reagent :refer [atom]]
-   [reagent.dom :as rdom]
-   [reagent.session :as session]
-   [reitit.frontend :as reitit]
-   [clerk.core :as clerk]
-   [accountant.core :as accountant]))
+;  (:require-macros [cljs.core.async.macros :refer [go]])
+  (:require [accountant.core :as accountant]
+            [clerk.core :as clerk]
+            [cljs-http.client :as http]
+            [clojure.core.async :refer [<! go]]
+            [reagent.core :as reagent :refer [atom]]
+            [reagent.dom :as rdom]
+            [reagent.session :as session]
+            [reitit.frontend :as reitit]))
 
 ;; -------------------------
 ;; Routes
@@ -16,7 +18,8 @@
     ["/items"
      ["" :items]
      ["/:item-id" :item]]
-    ["/about" :about]]))
+    ["/about" :about]
+    ["/uusi-sivu" :uusi-sivu]]))
 
 (defn path-for [route & [params]]
   (if params
@@ -59,6 +62,33 @@
   (fn [] [:span.main
           [:h1 "About projekti"]]))
 
+(def text (reagent/atom ""))
+
+(def choice (reagent/atom ""))
+
+(def result (reagent/atom ""))
+
+(defn send-request [teksti valinta]
+  (println "Teksti on" teksti " valinta on " valinta)
+  (go (let [response (<! (http/post "/formi" {:form-params {:teksti teksti :valinta valinta}
+                                              :type :json
+                                              :async? true}))]
+        (reset! result (:body response)))))
+
+(defn uusi-sivu []
+  (fn [] [:span-main
+          [:h1 "Uusi sivu"]
+          [:form {:on-submit #(.preventDefault %)}
+           [:p
+            [:input {:type :text
+                     :value @text
+                     :on-change #(reset! text (.-value (.-target %)))}]]
+           [:div {:on-change #(reset! choice (.-value (.-target %)))} 
+            [:div [:label [:input {:type :radio :name "case" :value :lower}] "Pienellä"]]
+            [:div [:label [:input {:type :radio :name "case" :value :upper}] "Isolla"]]]
+           [:button {:type "submit"
+                     :on-click #(send-request @text @choice)} "Push me ;-)"]]
+          [:h2 "Teksti on:" @result]]))
 
 ;; -------------------------
 ;; Translate routes -> page components
@@ -68,8 +98,8 @@
     :index #'home-page
     :about #'about-page
     :items #'items-page
-    :item #'item-page))
-
+    :item #'item-page
+    :uusi-sivu #'uusi-sivu))
 
 ;; -------------------------
 ;; Page mounting component
@@ -80,6 +110,7 @@
       [:div
        [:header
         [:p [:a {:href (path-for :index)} "Home"] " | "
+         [:a {:href (path-for :uusi-sivu)} "Uusi sivu"] " | "
          [:a {:href (path-for :about)} "About projekti"]]]
        [page]
        [:footer

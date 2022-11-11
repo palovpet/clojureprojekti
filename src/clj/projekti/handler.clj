@@ -1,9 +1,9 @@
 (ns projekti.handler
-  (:require
-   [reitit.ring :as reitit-ring]
-   [projekti.middleware :refer [middleware]]
-   [hiccup.page :refer [include-js include-css html5]]
-   [config.core :refer [env]]))
+  (:require [clojure.string :as string]
+            [config.core :refer [env]]
+            [hiccup.page :refer [html5 include-css include-js]]
+            [projekti.middleware :refer [middleware ring-opts]]
+            [reitit.ring :as reitit-ring]))
 
 (def mount-target
   [:div#app
@@ -32,6 +32,20 @@
    :headers {"Content-Type" "text/html"}
    :body (loading-page)})
 
+(defn form-handler [request]
+  (let [parametrit (:params request)
+        teksti (:teksti parametrit)
+        valinta (:valinta parametrit)
+        muutettu-teksti (case valinta
+                          "lower" (string/lower-case teksti)
+                          "upper" (string/upper-case teksti)
+                          teksti)]
+  {:status 200
+   :headers {"Content-Type" "tect/html"}
+   :body muutettu-teksti}  )
+  )
+
+
 (def app
   (reitit-ring/ring-handler
    (reitit-ring/router
@@ -40,7 +54,10 @@
       ["" {:get {:handler index-handler}}]
       ["/:item-id" {:get {:handler index-handler
                           :parameters {:path {:item-id int?}}}}]]
-     ["/about" {:get {:handler index-handler}}]])
+     ["/about" {:get {:handler index-handler}}]
+      ["/uusi-sivu" {:get {:handler index-handler}}]
+     ["/formi" {:post {:handler form-handler}}]]
+    ring-opts)
    (reitit-ring/routes
     (reitit-ring/create-resource-handler {:path "/" :root "/public"})
     (reitit-ring/create-default-handler))
